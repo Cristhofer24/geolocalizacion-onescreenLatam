@@ -72,6 +72,9 @@ $page_links_config = array(
 
 4. **Guarda el archivo** y limpia caché (si usas caché en WordPress).
 
+> **Importante para WordPress:**  
+> Si vas a copiar este código dentro de `functions.php` o de un plugin como **Code Snippets**, **no pegues la etiqueta de apertura `<?php`** de `page-specific-geolocation-snippet.php`. Solo copia el contenido de las funciones, porque esos archivos/snippets ya incluyen su propia apertura PHP.
+
 ### 🌎 Cómo agregar nuevos países (MX, PE, etc.)
 
 Actualmente el snippet está preparado para trabajar con **dos países**: `CO` (Colombia) y `EC` (Ecuador).  
