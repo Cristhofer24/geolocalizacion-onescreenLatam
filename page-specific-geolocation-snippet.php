@@ -1,5 +1,7 @@
 <?php
 // Prevenir acceso directo
+
+// Prevenir acceso directo
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -14,6 +16,88 @@ function safe_esc_js($text)
     }
     // Fallback: escapar caracteres especiales manualmente
     return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Devuelve el mapa de endpoints (slug => identificador de página).
+ * Endpoints en esta lista excluidos del script no deben tener entrada en page_links_config.
+ *
+ * @return array
+ */
+function get_page_geo_endpoint_map()
+{
+    return array(
+        'aulas-clase'     => array('aulas-clase'),
+        'empresas'        => array('empresas'),
+        'gobierno'        => array('gobierno'),
+        'retail'          => array('retail'),
+        'software'        => array('software'),
+        'pantalla-led'    => array('pantalla-led'),
+        '32-pulgadas'     => array('32-pulgadas'),
+        '65-pulgadas'     => array('65-pulgadas'),
+        '75-pulgadas'     => array('75-pulgadas'),
+        '86-pulgadas'     => array('86-pulgadas'),
+        '98-pulgadas'     => array('98-pulgadas'),
+        'core'            => array('core'),
+        't7'              => array('t7'),
+        'titan'           => array('titan'),
+        'wandr'           => array('wandr'),
+        'clientes'        => array('clientes'),
+        'distribuidores'  => array('distribuidores'),
+        'rental'          => array('rental'),
+        'recursos'        => array('recursos'),
+        'registro-exitoso' => array('registro-exitoso'), // academy/registro-exitoso - sin geolocalización
+    );
+}
+
+/**
+ * Identificadores de página donde NO se debe cargar el script de geolocalización (conservan comportamiento WordPress).
+ *
+ * @return array
+ */
+function get_page_geo_excluded_identifiers()
+{
+    return array('registro-exitoso');
+}
+
+/**
+ * Obtiene el identificador de página actual para geolocalización (path → clave usada en page_links_config).
+ *
+ * @return string
+ */
+function get_current_page_geo_identifier()
+{
+    $current_url = '';
+    if (function_exists('home_url')) {
+        $current_url = call_user_func('home_url', $_SERVER['REQUEST_URI']);
+    } else {
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        $current_url = $protocol . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+    }
+    $path = (string) parse_url($current_url, PHP_URL_PATH);
+    $path = '/' . ltrim($path, '/');
+    $path = rtrim($path, '/') . '/';
+
+    if ((function_exists('is_front_page') && call_user_func('is_front_page')) ||
+        (function_exists('is_home') && call_user_func('is_home')) ||
+        $path === '/'
+    ) {
+        return '/';
+    }
+
+    $page_identifier = '/';
+    foreach (get_page_geo_endpoint_map() as $identifier => $slugs) {
+        foreach ($slugs as $slug) {
+            $slug = trim((string) $slug, " \t\n\r\0\x0B/");
+            if ($slug === '') {
+                continue;
+            }
+            if (strpos($path, '/' . $slug . '/') !== false) {
+                return $identifier;
+            }
+        }
+    }
+    return $page_identifier;
 }
 
 /**
@@ -44,30 +128,7 @@ function get_page_specific_links()
     ) {
         $page_identifier = '/';
     } else {
-        // ---- SOLO EDITA ESTO: slugs/endpoint que quieres detectar ----
-        // Key = identificador; Value = lista de slugs que deben matchear en la URL
-        $endpoint_map = array(
-            'aulas-clase' => array('aulas-clase'),
-            'empresas'    => array('empresas'),
-            'gobierno'    => array('gobierno'),
-            'retail'      => array('retail'),
-            'software'    => array('software'),
-            'pantalla-led'   => array('pantalla-led'),
-            '32-pulgadas'    => array('32-pulgadas'),
-            '65-pulgadas'    => array('65-pulgadas'),
-            '75-pulgadas'    => array('75-pulgadas'),
-            '86-pulgadas'    => array('86-pulgadas'),
-            '98-pulgadas'    => array('98-pulgadas'),
-            'core'    => array('core'),
-            't7'    => array('t7'),
-            'titan'    => array('titan'),
-            'wandr'    => array('wandr'),
-            'clientes' => array('clientes'),
-            'distribuidores' => array('distribuidores'),
-            'rental' => array('rental'),
-            'recursos' => array('recursos'),
-        );
-
+        $endpoint_map = get_page_geo_endpoint_map();
         $page_identifier = '/';
         foreach ($endpoint_map as $identifier => $slugs) {
             foreach ($slugs as $slug) {
@@ -862,6 +923,15 @@ function get_page_specific_links()
  */
 function enqueue_page_specific_geolocation_script()
 {
+    // En estos endpoints NO se carga el script: conservan el comportamiento original de WordPress
+    $excluded = get_page_geo_excluded_identifiers();
+    $current_identifier = get_current_page_geo_identifier();
+    if (in_array($current_identifier, $excluded, true)) {
+        global $page_specific_geo_script;
+        $page_specific_geo_script = '';
+        return;
+    }
+
     // Obtener enlaces según la página actual
     $country_links = get_page_specific_links();
 
